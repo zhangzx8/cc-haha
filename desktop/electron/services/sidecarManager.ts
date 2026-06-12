@@ -16,6 +16,11 @@ export type SidecarPlan = {
   env: NodeJS.ProcessEnv
 }
 
+export type SpawnSidecarDeps = {
+  existsSyncFn?: typeof existsSync
+  spawnFn?: typeof spawn
+}
+
 const PROXY_ENV_KEYS = [
   'HTTP_PROXY',
   'HTTPS_PROXY',
@@ -225,13 +230,15 @@ export function createAdapterPlan({
   }
 }
 
-export function spawnSidecar(plan: SidecarPlan): SidecarChild {
-  if (!existsSync(plan.command)) {
+export function spawnSidecar(plan: SidecarPlan, deps: SpawnSidecarDeps = {}): SidecarChild {
+  const exists = deps.existsSyncFn ?? existsSync
+  if (!exists(plan.command)) {
     throw new Error(`Electron sidecar binary not found: ${plan.command}. Run "cd desktop && bun run build:sidecars" first.`)
   }
-  return spawn(plan.command, plan.args, {
+  return (deps.spawnFn ?? spawn)(plan.command, plan.args, {
     env: plan.env,
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   })
 }
 
@@ -251,8 +258,9 @@ export function killSidecar(child: SidecarChild, sync = false, deps: KillSidecar
   const platform = deps.platform ?? process.platform
   if (platform === 'win32' && child.pid) {
     const args = ['/F', '/T', '/PID', String(child.pid)]
-    if (sync) (deps.spawnSyncFn ?? spawnSync)('taskkill', args, { stdio: 'ignore' })
-    else (deps.spawnAsync ?? spawn)('taskkill', args, { stdio: 'ignore' })
+    const options = { stdio: 'ignore', windowsHide: true } as const
+    if (sync) (deps.spawnSyncFn ?? spawnSync)('taskkill', args, options)
+    else (deps.spawnAsync ?? spawn)('taskkill', args, options)
     return
   }
   child.kill()

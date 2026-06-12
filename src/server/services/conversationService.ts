@@ -62,6 +62,20 @@ export function cliExitSeverity(code: number | null): 'info' | 'error' {
   return 'error'
 }
 
+export function buildConversationCliSpawnOptions(
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+) {
+  return {
+    cwd,
+    env,
+    stdin: 'pipe',
+    stdout: 'pipe',
+    stderr: 'pipe',
+    windowsHide: true,
+  } as const
+}
+
 type AttachmentRef = {
   type: 'file' | 'image'
   name?: string
@@ -285,13 +299,7 @@ export class ConversationService {
 
     let proc: ReturnType<typeof Bun.spawn>
     try {
-      proc = Bun.spawn(args, {
-        cwd: launchWorkDir,
-        env: childEnv,
-        stdin: 'pipe',
-        stdout: 'pipe',
-        stderr: 'pipe',
-      })
+      proc = Bun.spawn(args, buildConversationCliSpawnOptions(launchWorkDir, childEnv))
     } catch (spawnErr) {
       void diagnosticsService.recordEvent({
         type: 'cli_spawn_failed',

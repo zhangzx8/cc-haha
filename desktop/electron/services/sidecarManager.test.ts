@@ -12,6 +12,7 @@ import {
   proxyUrlFromElectronProxyRules,
   pushStartupLog,
   resolveHostTriple,
+  spawnSidecar,
   windowsPowerShellOverride,
   type SidecarChild,
 } from './sidecarManager'
@@ -145,7 +146,7 @@ describe('Electron sidecar manager', () => {
     const spawnAsync = vi.fn()
     const spawnSyncFn = vi.fn()
     killSidecar(child, false, { platform: 'win32', spawnAsync: spawnAsync as never, spawnSyncFn: spawnSyncFn as never })
-    expect(spawnAsync).toHaveBeenCalledWith('taskkill', ['/F', '/T', '/PID', '777'], { stdio: 'ignore' })
+    expect(spawnAsync).toHaveBeenCalledWith('taskkill', ['/F', '/T', '/PID', '777'], { stdio: 'ignore', windowsHide: true })
     expect(spawnSyncFn).not.toHaveBeenCalled()
     expect(child.kill).not.toHaveBeenCalled()
   })
@@ -155,8 +156,27 @@ describe('Electron sidecar manager', () => {
     const spawnAsync = vi.fn()
     const spawnSyncFn = vi.fn()
     killSidecar(child, true, { platform: 'win32', spawnAsync: spawnAsync as never, spawnSyncFn: spawnSyncFn as never })
-    expect(spawnSyncFn).toHaveBeenCalledWith('taskkill', ['/F', '/T', '/PID', '777'], { stdio: 'ignore' })
+    expect(spawnSyncFn).toHaveBeenCalledWith('taskkill', ['/F', '/T', '/PID', '777'], { stdio: 'ignore', windowsHide: true })
     expect(spawnAsync).not.toHaveBeenCalled()
+  })
+
+  it('hides Windows console windows when launching sidecars', () => {
+    const spawned = {} as SidecarChild
+    const spawnFn = vi.fn(() => spawned)
+    const existsSyncFn = vi.fn(() => true)
+    const plan = {
+      command: '/app/desktop/src-tauri/binaries/claude-sidecar-x86_64-pc-windows-msvc.exe',
+      args: ['server', '--port', '49321'],
+      env: { CLAUDE_H5_AUTO_PUBLIC_URL: '1' },
+    }
+
+    expect(spawnSidecar(plan, { existsSyncFn, spawnFn: spawnFn as never })).toBe(spawned)
+    expect(existsSyncFn).toHaveBeenCalledWith(plan.command)
+    expect(spawnFn).toHaveBeenCalledWith(plan.command, plan.args, {
+      env: plan.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
   })
 
   it('forwards a PowerShell shell choice to the sidecar only on Windows', () => {

@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import {
+  buildConversationCliSpawnOptions,
   ConversationService,
   DESKTOP_CLI_GRACEFUL_SHUTDOWN_TIMEOUT_MS,
 } from '../services/conversationService.js'
@@ -179,6 +180,19 @@ describe('ConversationService', () => {
       `${path.join(tmpDir, 'projects', 'D--workspace-code-myself-code-cc-haha', 'memory')}${path.sep}`,
     )
     await expect(fs.stat(path.dirname(env.CLAUDE_CODE_DIAGNOSTICS_FILE))).resolves.toBeTruthy()
+  })
+
+  test('builds hidden CLI spawn options for desktop session subprocesses', () => {
+    const env = { CLAUDECODE: '1' }
+
+    expect(buildConversationCliSpawnOptions('/workspace/project', env)).toEqual({
+      cwd: '/workspace/project',
+      env,
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
+      windowsHide: true,
+    })
   })
 
   test('buildChildEnv pins desktop memory to the current sanitized project directory', async () => {
