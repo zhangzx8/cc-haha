@@ -2557,6 +2557,83 @@ describe('MessageList nested tool calls', () => {
     expect(screen.queryByRole('button', { name: 'Latest' })).toBeNull()
   })
 
+  it('lets the user drag away from active thinking output before the programmatic scroll settles', async () => {
+    let resizeCallback: ResizeObserverCallback | null = null
+    class TestResizeObserver {
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback
+      }
+    }
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+
+    useChatStore.setState({
+      sessions: {
+        [ACTIVE_TAB]: makeSessionState({
+          chatState: 'thinking',
+          activeThinkingId: 'thinking-1',
+          messages: [
+            {
+              id: 'user-1',
+              type: 'user_text',
+              content: '分析一下这段代码',
+              timestamp: 1,
+            },
+            {
+              id: 'thinking-1',
+              type: 'thinking',
+              content: '正在阅读代码路径',
+              timestamp: 2,
+            },
+          ],
+        }),
+      },
+    })
+
+    const { container } = render(<MessageList />)
+    const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
+    let scrollTop = 600
+    let scrollHeight = 1000
+    Object.defineProperty(scroller, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    })
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 400 })
+    Object.defineProperty(scroller, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value) => {
+        scrollTop = value
+      },
+    })
+
+    await waitFor(() => {
+      expect(resizeCallback).not.toBeNull()
+    })
+
+    act(() => {
+      resizeCallback?.([{
+        contentRect: { height: 600 },
+      } as ResizeObserverEntry], {} as ResizeObserver)
+    })
+
+    scrollTop = 200
+    fireEvent.scroll(scroller)
+    expect(screen.getByRole('button', { name: 'Latest' })).toBeTruthy()
+
+    scrollHeight = 1200
+    act(() => {
+      resizeCallback?.([{
+        contentRect: { height: 760 },
+      } as ResizeObserverEntry], {} as ResizeObserver)
+    })
+
+    expect(scrollTop).toBe(200)
+  })
+
   it('ignores one-pixel content resize jitter while pinned to active thinking output', async () => {
     let resizeCallback: ResizeObserverCallback | null = null
     class TestResizeObserver {

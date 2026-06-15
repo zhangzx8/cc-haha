@@ -1506,11 +1506,16 @@ export function MessageList({ sessionId, compact = false }: MessageListProps = {
     // prevent the jump-to-latest button from flickering during auto-scroll.
     const container = scrollContainerRef.current
     if (!container) return
-    const shouldIgnoreRecentProgrammaticScroll =
-      performance.now() < ignoreProgrammaticScrollUntilRef.current &&
+    const matchesProgrammaticScrollTop =
       ignoreProgrammaticScrollTopRef.current !== null &&
       Math.abs(container.scrollTop - ignoreProgrammaticScrollTopRef.current) < 1
-    if (isProgrammaticScrollingRef.current || shouldIgnoreRecentProgrammaticScroll) {
+    const shouldIgnoreRecentProgrammaticScroll =
+      matchesProgrammaticScrollTop &&
+      (
+        isProgrammaticScrollingRef.current ||
+        performance.now() < ignoreProgrammaticScrollUntilRef.current
+      )
+    if (shouldIgnoreRecentProgrammaticScroll) {
       syncVirtualViewportFromContainer(container)
       return
     }
